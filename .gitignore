@@ -1,0 +1,16 @@
+# Environment configuration and secrets
+.env
+
+# Persistent application data
+uptime-kuma-data/*
+!uptime-kuma-data/.gitkeep
+
+# Let's Encrypt certificates and account information
+letsencrypt/*
+!letsencrypt/.gitkeep
+
+# Temporary and backup files
+*.tar
+*.tar.gz
+*.bak
+*.log
