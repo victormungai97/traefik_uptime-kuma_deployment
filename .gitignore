@@ -1,5 +1,5 @@
 # Environment configuration and secrets
-.env
+*.env
 
 # Persistent application data
 uptime-kuma-data/*
