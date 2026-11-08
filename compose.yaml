@@ -1,0 +1,105 @@
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # Disable the Traefik monitoring dashboard
+      - "--api.dashboard=false"
+      # Make service discoverable by Traefik
+      - "--providers.docker=true"
+      # Enable the API handler for healthcheck
+      - "--ping=true"
+      # Set success status code for ping
+      - "--ping.terminatingStatusCode=204"
+      # Ensure containers are not automatically discoverable, thus protecting any future internal services e.g. db
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web"
+      # Set the entry point for insecure HTTP application(s)
+      - "--entrypoints.web.address=:80"
+      # Set redirection of HTTP requests to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Set the entry point for secure HTTPS application(s)
+      - "--entrypoints.websecure.address=:443"
+      # Configure automated provision of TLS certificates through Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Enable Traefik to discover other containers
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - web
+    # Configure physical resource constraints for container to run on platform
+    deploy:
+      resources:
+        # Platform must prevent the container from allocating more resources than defined
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        # Platform must guarantee the container it can allocate at least the configured amounts
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    # Set logging with auto rotation
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      # This command uses Traefik's internal CLI to check the ping endpoint
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:2
+    container_name: uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - "./uptime-kuma-data:/app/data"
+    networks:
+      - web
+    # Set port accessible by other services connected to the same network,
+    # but won’t be published on the host machine, hence not accessible over internet.
+    expose:
+      - "3001"
+    labels:
+      # Make service discoverable by Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptime-kuma.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.uptime-kuma.entrypoints=websecure"
+      - "traefik.http.routers.uptime-kuma.tls=true"
+      - "traefik.http.routers.uptime-kuma.tls.certresolver=letsencrypt"
+      - "traefik.http.services.uptime-kuma.loadbalancer.server.port=3001"
+    # Configure physical resource constraints for container to run on platform
+    deploy:
+      resources:
+        # Platform must prevent the container from allocating more resources than defined
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        # Platform must guarantee the container it can allocate at least the configured amounts
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 5s
+
+networks:
+  web:
+    name: web
+    driver: bridge
