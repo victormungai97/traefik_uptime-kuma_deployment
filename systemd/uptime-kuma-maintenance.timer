@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Uptime Kuma maintenance weekly
+
+[Timer]
+# Sunday at 03:30 in the server's local timezone.
+OnCalendar=Sun *-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=uptime-kuma-maintenance.service
+
+[Install]
+WantedBy=timers.target
