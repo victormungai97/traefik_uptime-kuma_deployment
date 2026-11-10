@@ -517,7 +517,7 @@ chmod 600 .env
 
 The `.env` file contains deployment configuration and is excluded from Git in this repository. Do not commit it, especially if it contains private information or secrets.
 
-## 9. Configure Docker Compose and Prepare persistent storage
+## 9. Configure Docker Compose
 
 This repository comes with a pre-configured Compose file (`compose.yaml`). This file uses bind-mounted directories in the repository folder. Create them if they do not already exist:
 
