@@ -24,7 +24,7 @@ The guide uses Ubuntu Server 22.04/24.04 LTS, but the deployment can be adapted 
 - [14. Updating the Deployment](#14-updating-the-deployment)
 - [15. Backups and Recovery](#15-backups-and-recovery)
 - [Weekly automated maintenance](#weekly-automated-maintenance)
-  - [Encrypted off-site backups using Restic](#encrypted-off-site-backups-using-Restic)
+  - [Encrypted off site backups using Restic](#encrypted-off-site-backups-using-restic)
 - [16. Security Recommendations](#16-security-recommendations)
 - [17. Troubleshooting](#17-troubleshooting)
 - [Repository Structure](#repository-structure)
