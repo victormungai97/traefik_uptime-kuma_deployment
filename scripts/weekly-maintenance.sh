@@ -39,7 +39,7 @@ Examples:
   sudo ${SCRIPT_NAME} --install-restic --init-restic
 
 Environment overrides:
-  PROJECT_DIR, BACKUP_DIR, LOG_FILE, RESTIC_ENV_FILE
+  DEPLOY_DIR, BACKUP_DIR, LOG_FILE, RESTIC_ENV_FILE
 USAGE
 }
 
