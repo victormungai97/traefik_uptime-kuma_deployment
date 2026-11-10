@@ -942,7 +942,8 @@ On the server, create the configuration file for Restic:
 
 ```bash
 sudo cp config/restic.env.example /etc/uptime-kuma-restic.env
-sudo install -o root -g root -m 600 /dev/null /etc/uptime-kuma-restic.env
+sudo chown root:root /etc/uptime-kuma-restic.env
+sudo chmod 600 /etc/uptime-kuma-restic.env
 sudo nano /etc/uptime-kuma-restic.env
 ```
 
