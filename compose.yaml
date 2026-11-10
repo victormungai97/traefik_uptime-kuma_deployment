@@ -1,4 +1,24 @@
 services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Block all mutating actions (POST, DELETE, etc.)
+      - POST=0
+      - ALLOW_START=0
+      - ALLOW_STOP=0
+      - ALLOW_RESTARTS=0
+      # Grant Traefik permission to only read what it needs
+      - CONTAINERS=1
+      - NETWORKS=1
+      - SERVICES=1
+      - INFO=1
+    networks:
+      - traefik-socket-security
+
   traefik:
     image: traefik:v3.7
     container_name: traefik
@@ -12,6 +32,8 @@ services:
       - "--ping=true"
       # Set success status code for ping
       - "--ping.terminatingStatusCode=204"
+      # Direct Traefik to the proxy over TCP instead of the socket file, enabling Traefik to discover other containers
+      - "--providers.docker.endpoint=tcp://docker-socket-proxy:2375"
       # Ensure containers are not automatically discoverable, thus protecting any future internal services e.g. db
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=web"
@@ -27,14 +49,17 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    depends_on:
+      - docker-socket-proxy
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      # Enable Traefik to discover other containers
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./letsencrypt:/letsencrypt"
     networks:
+      - traefik-socket-security
       - web
     # Configure physical resource constraints for container to run on platform
     deploy:
@@ -100,6 +125,11 @@ services:
       timeout: 5s
 
 networks:
+  # Strictly internal network so the proxy API is hidden from the web
+  traefik-socket-security:
+    internal: true
+  # Network used to connect Traefik to your application containers
   web:
+    external: true
     name: web
     driver: bridge
