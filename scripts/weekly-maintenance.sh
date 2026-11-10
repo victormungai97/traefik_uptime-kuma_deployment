@@ -254,6 +254,20 @@ for service in $expected_services; do
         log "ERROR: Service '$service' is not running after backup."
         exit 1
     fi
+    container_name="$(docker inspect --format='{{.Name}}' "$container_id" | sed 's|^\/||')"
+    container_health_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_id")"
+    if [[ "$container_health_status" == "unhealthy" ]]; then
+        log "ERROR: Container '$container_name' is unhealthy after backup."
+        exit 1
+    elif [[ "$container_health_status" == "no-healthcheck" ]]; then
+        # Container doesn't have a healthcheck defined in compose.yaml,
+        # fall back to checking if the container is simply running
+        container_running="$(docker inspect --format='{{.State.Running}}' "$container_id")"
+        if [[ "$container_running" != "true" ]]; then
+            log "ERROR: Container '$container_name' has no healthcheck and is not running after backup."
+            exit 1
+        fi
+    fi
 done
 log "All Compose services are running after backup."
 
