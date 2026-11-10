@@ -237,11 +237,13 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_file="$BACKUP_DIR/uptime-kuma-$timestamp.tar.gz"
 temporary_backup="$backup_file.tmp"
 
-# Stop services briefly so the SQLite database (if used) and ACME state are copied consistently.
-log "Stopping Compose services for backup..."
-# Set this first so the EXIT trap attempts a restart even if stop partially fails.
-containers_stopped=true
-(cd "$DEPLOY_DIR" && docker compose stop)
+if [[ "$RESTIC_DRY_RUN" == false ]]; then
+    # Stop services briefly so the SQLite database (if used) and ACME state are copied consistently.
+    log "Stopping Compose services for backup..."
+    # Set this first so the EXIT trap attempts a restart even if stop partially fails.
+    containers_stopped=true
+    (cd "$DEPLOY_DIR" && docker compose stop)
+fi
 
 log "Creating backup archive..."
 tar --exclude='./.git' -czf "$temporary_backup" -C "$DEPLOY_DIR" compose.yaml .env uptime-kuma-data letsencrypt
@@ -250,35 +252,40 @@ mv "$temporary_backup" "$backup_file"
 log "Local backup created: $backup_file"
 tar -tzf "$backup_file" >/dev/null
 log "Local backup archive integrity check passed."
-
+if [[ "$RESTIC_DRY_RUN" == true ]]; then
+    rm -f "$backup_file"
+fi
 temporary_backup=""
-log "Starting Compose services..."
-(cd "$DEPLOY_DIR" && docker compose start)
-containers_stopped=false
 
-expected_services="$(cd "$DEPLOY_DIR" && docker compose config --services)"
-for service in $expected_services; do
-    container_id="$(cd "$DEPLOY_DIR" && docker compose ps --status running -q "$service")"
-    if [[ -z "$container_id" ]]; then
-        log "ERROR: Service '$service' is not running after backup."
-        exit 1
-    fi
-    container_name="$(docker inspect --format='{{.Name}}' "$container_id" | sed 's|^\/||')"
-    container_health_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_id")"
-    if [[ "$container_health_status" == "unhealthy" ]]; then
-        log "ERROR: Container '$container_name' is unhealthy after backup."
-        exit 1
-    elif [[ "$container_health_status" == "no-healthcheck" ]]; then
-        # Container doesn't have a healthcheck defined in compose.yaml,
-        # fall back to checking if the container is simply running
-        container_running="$(docker inspect --format='{{.State.Running}}' "$container_id")"
-        if [[ "$container_running" != "true" ]]; then
-            log "ERROR: Container '$container_name' has no healthcheck and is not running after backup."
+if [[ "$RESTIC_DRY_RUN" == false ]]; then
+    log "Starting Compose services..."
+    (cd "$DEPLOY_DIR" && docker compose start)
+    containers_stopped=false
+
+    expected_services="$(cd "$DEPLOY_DIR" && docker compose config --services)"
+    for service in $expected_services; do
+        container_id="$(cd "$DEPLOY_DIR" && docker compose ps --status running -q "$service")"
+        if [[ -z "$container_id" ]]; then
+            log "ERROR: Service '$service' is not running after backup."
             exit 1
         fi
-    fi
-done
-log "All Compose services are running after backup."
+        container_name="$(docker inspect --format='{{.Name}}' "$container_id" | sed 's|^\/||')"
+        container_health_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_id")"
+        if [[ "$container_health_status" == "unhealthy" ]]; then
+            log "ERROR: Container '$container_name' is unhealthy after backup."
+            exit 1
+        elif [[ "$container_health_status" == "no-healthcheck" ]]; then
+            # Container doesn't have a healthcheck defined in compose.yaml,
+            # fall back to checking if the container is simply running
+            container_running="$(docker inspect --format='{{.State.Running}}' "$container_id")"
+            if [[ "$container_running" != "true" ]]; then
+                log "ERROR: Container '$container_name' has no healthcheck and is not running after backup."
+                exit 1
+            fi
+        fi
+    done
+    log "All Compose services are running after backup."
+fi
 
 # Upload only after the services are back online, so a slow internet connection
 # does not extend the monitoring outage.
@@ -293,6 +300,11 @@ if [[ "$RESTIC_ENABLED" == true ]]; then
     log "Off-site backup upload and retention completed."
 else
     log "Restic operations skipped. Local backup is available at: $backup_file"
+fi
+
+if [[ "$RESTIC_DRY_RUN" == true ]]; then
+    log "===== Maintenance dry run completed successfully ====="
+    exit 0
 fi
 
 log "Updating Ubuntu package indexes..."
