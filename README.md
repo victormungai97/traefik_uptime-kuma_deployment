@@ -921,7 +921,7 @@ Backups are written to `/var/backups/uptime-kuma/` by default. Each archive cont
 
 Archives contain credentials and application data. The script creates the backup directory with restrictive permissions and sets each archive to mode `600`.
 
-Monitoring is interrupted briefly while containers are stopped to create the local archive. The potentially slower S3 upload happens after the services have restarted. Schedule the timer during a quiet maintenance window. Schedule the timer during a quiet maintenance window.
+Monitoring is interrupted briefly while containers are stopped to create the local archive. The potentially slower S3 upload happens after the services have restarted. Schedule the timer during a quiet maintenance window.
 
 ### Encrypted off site backups using Restic
 
