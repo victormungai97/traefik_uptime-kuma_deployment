@@ -1305,7 +1305,7 @@ The `letsencrypt` and `uptime-kuma-data` data directories are created on the ser
 
 ## License
 
-This repository's original deployment configuration and documentation may be distributed under the [MIT License](https://opensource.org/license/mit) if you add an accompanying `LICENSE` file.
+This repository's original deployment configuration and documentation may be distributed under the [MIT License](https://opensource.org/license/mit).
 
 Uptime Kuma and Traefik are separate projects with their own licenses and copyright notices. Refer to their respective repositories for licensing information:
 
