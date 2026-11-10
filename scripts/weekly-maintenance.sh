@@ -32,7 +32,7 @@ Options:
 Default behaviour (no options): local backup + Restic upload.
 
 Examples:
-  sudo ${}
+  sudo ${SCRIPT_NAME}
   sudo ${SCRIPT_NAME} --skip-restic
   sudo ${SCRIPT_NAME} --install-restic
   sudo ${SCRIPT_NAME} --init-restic
