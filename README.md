@@ -1285,13 +1285,19 @@ uptime-kuma-traefik/
 ├── .env.example
 ├── .gitignore
 ├── README.md
-│
+├── config/
+│   └── restic.env.example
+├── scripts/
+│   └── weekly-scheduled-maintenance.sh
+├── systemd/
+│   ├── uptime-kuma-maintenance.service
+│   └── uptime-kuma-maintenance.timer
 ├── letsencrypt/
 │   └── .gitkeep
-│
 └── uptime-kuma-data/
     └── .gitkeep
 ```
+
 
 The `letsencrypt` and `uptime-kuma-data` data directories are created on the server and hold persistent application data outside the containers. Their contents are intentionally excluded from Git.
 
