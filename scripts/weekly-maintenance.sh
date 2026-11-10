@@ -158,6 +158,7 @@ wait_for_healthy_services() {
                     ;;
             esac
         done
+    done
 
     log "All Compose services passed their health checks."
 }
