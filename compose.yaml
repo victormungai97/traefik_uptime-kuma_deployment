@@ -4,6 +4,7 @@ services:
     container_name: docker-socket-proxy
     restart: unless-stopped
     volumes:
+      # Mount the Docker socket on the proxy
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       # Block all mutating actions (POST, DELETE, etc.)
