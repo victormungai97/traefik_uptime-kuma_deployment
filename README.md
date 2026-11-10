@@ -595,9 +595,9 @@ You can read more on deployment [here](https://massivegrid.com/blog/uptime-kuma-
 
 ### Important version note
 
-The example uses the Uptime Kuma `2` image tag and Traefik `v3` image tag.
+The example uses the Uptime Kuma `2` image tag and Traefik `v3.7` image tag.
 
-These are major-version tags, not immutable image versions. For a production deployment, consider pinning each image to a specific tested release or digest. This gives you more predictable upgrades and reduces the risk of an unexpected image update changing the deployment.
+These are major-version tags, not immutable image versions. For a production deployment, consider pinning Traefik image to a specific tested release or digest, or keeping the pre-provided tag. This gives you more predictable upgrades and reduces the risk of an unexpected image update changing the deployment. With regards to Uptime Kuma, following the maintainer's [suggestion](https://hub.docker.com/r/louislam/uptime-kuma#tags), keep the tag as is.
 
 Check the official project release information before choosing the exact versions:
 
@@ -1292,7 +1292,7 @@ uptime-kuma-traefik/
 ├── config/
 │   └── restic.env.example
 ├── scripts/
-│   └── weekly-scheduled-maintenance.sh
+│   └── weekly-maintenance.sh
 ├── systemd/
 │   ├── uptime-kuma-maintenance.service
 │   └── uptime-kuma-maintenance.timer
