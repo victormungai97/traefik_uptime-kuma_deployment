@@ -983,9 +983,9 @@ sudo apt-get update
 sudo apt-get install -y restic
 ```
 
-Additionally, The maintenance script checks that a configured Restic repository is accessible before it stops the containers. It does not silently initialize repositories. However, it contains an `--init-restic` flag which, if provided, on confirming that there is no prior initialized repository, attempts initialization and then verifies the repository. If the repository already exists and is accessible, explicitly passing `--init-restic` still results in the verification succeeds and the existing repository is used.
+Additionally, The maintenance script checks that a configured Restic repository is accessible before it stops the containers. It does not silently initialize repositories. However, it contains an `--init-restic` flag which, when explicitly supplied, instructs the script to attempt initialization of the configured repository if its initial accessibility check fails and then verifies the repository. If the repository already exists and is accessible, explicitly passing `--init-restic` still results in the verification succeeds and the existing repository is used.
 
-However, this approach can cause unforeseen issues such as:
+However, this check can also fail because of incorrect credentials, a wrong repository path or network problems and can cause unforeseen issues such as:
 
 - accidentally creating the wrong repository, e.g. if there is a configuration mistake, perhaps using the wrong bucket or repository path.
 - Existing repositories being treated as disposable.
@@ -998,7 +998,7 @@ sudo bash -c 'set -a; . /etc/uptime-kuma-restic.env; set +a; restic init'
 
 Initialization is a one-time operation for a new repository. Installing Restic does not initialize a repository.
 
-**Caution:** If passing `--init-restic` so as to initialize the configured destination if Restic considers it uninitialized, then check the repository path and bucket carefully before use.
+**Caution:** If passing `--init-restic` so as to initialize the configured destination if Restic considers it uninitialized, then verify the configuration before use.
 
 ### Maintenance script options
 
