@@ -38,7 +38,7 @@ The deployment consists of two Docker containers:
 
 | Service     | Responsibility                                                                     |
 | ----------- | ---------------------------------------------------------------------------------- |
-| Traefik     | Reverse proxy, HTTP-to-HTTPS redirection, and automatic TLS certificate management |
+| Traefik     | Reverse , HTTP-to-HTTPS redirection, and automatic TLS certificate management |
 | Uptime Kuma | Website, server, application, and service monitoring                               |
 
 Traffic follows this route:
@@ -53,7 +53,7 @@ Traffic follows this route:
               +-----------+
               |  Traefik  |
               |  Reverse  |
-              |   Proxy   |
+              |      |
               +-----------+
                     |
                     |
@@ -1160,7 +1160,7 @@ The Compose configuration mounts the Docker socket read-only:
 
 This prevents ordinary filesystem writes through that mount, but it does not make the Docker API safe to expose to an untrusted container. Access to the Docker socket can effectively provide extensive control over the host.
 
-For a more security-conscious deployment, consider using a Docker socket proxy with a restricted API surface instead of mounting the Docker socket directly.
+For a more security-conscious deployment, a Docker socket proxy with a restricted API surface has been implemented instead of mounting the Docker socket directly.
 
 ### Application security
 
