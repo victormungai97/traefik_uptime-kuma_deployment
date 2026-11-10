@@ -4,6 +4,7 @@
 set -Eeuo pipefail
 umask 077
 
+SCRIPT_NAME="$(basename "$0")"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/uptime-kuma}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/uptime-kuma}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
@@ -31,7 +32,7 @@ Options:
 Default behaviour (no options): local backup + Restic upload.
 
 Examples:
-  sudo ${SCRIPT_NAME}
+  sudo ${}
   sudo ${SCRIPT_NAME} --skip-restic
   sudo ${SCRIPT_NAME} --install-restic
   sudo ${SCRIPT_NAME} --init-restic
