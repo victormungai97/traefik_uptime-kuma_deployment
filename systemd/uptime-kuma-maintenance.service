@@ -6,5 +6,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
+Environment="HEALTH_TIMEOUT=180"
+Environment="HEALTH_POLL_INTERVAL=5"
 User=root
 ExecStart=/opt/uptime-kuma/scripts/weekly-maintenance.sh
