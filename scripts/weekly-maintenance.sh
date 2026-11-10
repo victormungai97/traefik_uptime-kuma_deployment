@@ -253,6 +253,7 @@ log "Local backup created: $backup_file"
 tar -tzf "$backup_file" >/dev/null
 log "Local backup archive integrity check passed."
 if [[ "$RESTIC_DRY_RUN" == true ]]; then
+    log "Dry run enabled: cleaning up temporary local backup file..."
     rm -f "$backup_file"
 fi
 temporary_backup=""
