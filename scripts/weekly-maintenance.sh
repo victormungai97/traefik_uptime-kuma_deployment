@@ -235,7 +235,7 @@ containers_stopped=true
 (cd "$DEPLOY_DIR" && docker compose stop)
 
 log "Creating backup archive..."
-tar -czf "$temporary_backup" -C "$DEPLOY_DIR" compose.yaml .env uptime-kuma-data letsencrypt
+tar --exclude='./.git' -czf "$temporary_backup" -C "$DEPLOY_DIR" compose.yaml .env uptime-kuma-data letsencrypt
 chmod 0600 "$temporary_backup"
 mv "$temporary_backup" "$backup_file"
 log "Local backup created: $backup_file"
