@@ -131,3 +131,5 @@ networks:
     internal: true
   # Network used to connect Traefik to application container(s)
   web:
+    external: true
+    name: web
