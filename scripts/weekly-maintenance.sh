@@ -80,6 +80,88 @@ log() {
     printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
 }
 
+# Maximum time to wait for each service to become healthy.
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-120}"
+HEALTH_POLL_INTERVAL="${HEALTH_POLL_INTERVAL:-3}"
+
+wait_for_healthy_services() {
+    local service container_id container_name
+    local health_status running_status
+    local deadline
+    local services
+
+    log "Waiting for Compose services to become healthy..."
+    services="$(cd "$DEPLOY_DIR" && docker compose config --services)" || return 1
+
+    for service in $services; do
+        [[ -n "$service" ]] || continue
+        container_id="$(cd "$DEPLOY_DIR" && docker compose ps -q "$service")"
+        if [[ -z "$container_id" ]]; then
+            log "ERROR: No container found for service '$service'."
+            return 1
+        fi
+
+        container_name="$(docker inspect --format '{{.Name}}' "$container_id")"
+        container_name="${container_name#/}"
+        deadline=$((SECONDS + HEALTH_TIMEOUT))
+
+        while true; do
+            running_status="$(
+                docker inspect \
+                    --format '{{.State.Running}}' \
+                    "$container_id"
+            )" || return 1
+
+            if [[ "$running_status" != "true" ]]; then
+                log "ERROR: Container '$container_name' is not running."
+                return 1
+            fi
+
+            health_status="$(
+                docker inspect \
+                    --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' \
+                    "$container_id"
+            )" || return 1
+
+            case "$health_status" in
+                healthy)
+                    log "Container '$container_name' is healthy."
+                    break
+                    ;;
+
+                starting|unhealthy)
+                    if (( SECONDS >= deadline )); then
+                        log "ERROR: Container '$container_name' did not become healthy within ${HEALTH_TIMEOUT}s (last status: $health_status)."
+                        docker logs --tail 30 "$container_id" >&2 || true
+                        return 1
+                    fi
+
+                    log "Waiting for '$container_name' (status: $health_status)..."
+                    sleep "$HEALTH_POLL_INTERVAL"
+                    ;;
+
+                no-healthcheck)
+                    log "WARNING: Container '$container_name' has no healthcheck; verifying running."
+                    # Container doesn't have a healthcheck defined in compose.yaml,
+                    # fall back to checking if the container is simply running
+                    container_running="$(docker inspect --format='{{.State.Running}}' "$container_id")"
+                    if [[ "$container_running" != "true" ]]; then
+                        log "ERROR: Container '$container_name' has no healthcheck and is not running after backup."
+                        exit 1
+                    fi
+                    break
+                    ;;
+
+                *)
+                    log "ERROR: Unexpected health status '$health_status' for '$container_name'."
+                    return 1
+                    ;;
+            esac
+        done
+
+    log "All Compose services passed their health checks."
+}
+
 if [[ "${EUID}" -ne 0 ]]; then
     echo "Run as root: sudo $0" >&2
     exit 1
@@ -262,29 +344,7 @@ if [[ "$RESTIC_DRY_RUN" == false ]]; then
     log "Starting Compose services..."
     (cd "$DEPLOY_DIR" && docker compose start)
     containers_stopped=false
-
-    expected_services="$(cd "$DEPLOY_DIR" && docker compose config --services)"
-    for service in $expected_services; do
-        container_id="$(cd "$DEPLOY_DIR" && docker compose ps --status running -q "$service")"
-        if [[ -z "$container_id" ]]; then
-            log "ERROR: Service '$service' is not running after backup."
-            exit 1
-        fi
-        container_name="$(docker inspect --format='{{.Name}}' "$container_id" | sed 's|^\/||')"
-        container_health_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_id")"
-        if [[ "$container_health_status" == "unhealthy" ]]; then
-            log "ERROR: Container '$container_name' is unhealthy after backup."
-            exit 1
-        elif [[ "$container_health_status" == "no-healthcheck" ]]; then
-            # Container doesn't have a healthcheck defined in compose.yaml,
-            # fall back to checking if the container is simply running
-            container_running="$(docker inspect --format='{{.State.Running}}' "$container_id")"
-            if [[ "$container_running" != "true" ]]; then
-                log "ERROR: Container '$container_name' has no healthcheck and is not running after backup."
-                exit 1
-            fi
-        fi
-    done
+    wait_for_healthy_services || exit 1
     log "All Compose services are running after backup."
 fi
 
@@ -321,13 +381,7 @@ log "Checking Docker and Compose after package updates..."
 systemctl is-active --quiet docker
 (cd "$DEPLOY_DIR" && docker compose up -d)
 
-for service in $expected_services; do
-    container_id="$(cd "$DEPLOY_DIR" && docker compose ps --status running -q "$service")"
-    if [[ -z "$container_id" ]]; then
-        log "ERROR: Service '$service' is not running after package updates."
-        exit 1
-    fi
-done
+wait_for_healthy_services || exit 1
 log "All Compose services are running after package updates."
 
 # Local retention applies in either mode, but only after the current backup,
