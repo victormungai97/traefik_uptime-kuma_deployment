@@ -948,10 +948,14 @@ sudo nano /etc/uptime-kuma-restic.env
 Example contents:
 
 ```bash
-RESTIC_REPOSITORY="s3:http(s)://s3-storage-service-domain[:s3-storage-service-port]/your-private-bucket:uptime-kuma"
-AWS_ACCESS_KEY_ID="your_s3_access_key_id"
-AWS_SECRET_ACCESS_KEY="your_s3_secret_access_key"
-RESTIC_PASSWORD="replace-with-a-long-unique-random-password"
+RESTIC_PASSWORD="<replace-with-a-long-unique-random-password>"
+# Restic Repository Configuration (S3 prefix)
+RESTIC_REPOSITORY="s3:http(s)://<s3-storage-service-domain>[:<s3-storage-service-port>]/<your-private-bucket>:uptime-kuma"
+# S3-compatible storage service's API credentials
+AWS_ACCESS_KEY_ID="<your_s3_access_key_id>"
+AWS_SECRET_ACCESS_KEY="<your_s3_secret_access_key>"
+# S3-compatible storage service's bucket's region, defaults to "us-east-1" if not specified
+AWS_DEFAULT_REGION="<your_s3_bucket_region>"
 ```
 
 Generate a strong password, for example:
