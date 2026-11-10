@@ -36,10 +36,10 @@ The guide uses Ubuntu Server 22.04/24.04 LTS, but the deployment can be adapted 
 
 The deployment consists of two Docker containers:
 
-| Service     | Responsibility                                                                     |
-| ----------- | ---------------------------------------------------------------------------------- |
+| Service     | Responsibility                                                                |
+| ----------- | ----------------------------------------------------------------------------- |
 | Traefik     | Reverse , HTTP-to-HTTPS redirection, and automatic TLS certificate management |
-| Uptime Kuma | Website, server, application, and service monitoring                               |
+| Uptime Kuma | Website, server, application, and service monitoring                          |
 
 Traffic follows this route:
 
@@ -564,9 +564,15 @@ Uptime Kuma:
 
 **Docker network**
 
-Both services share a Docker bridge network named `web`.
+Both services share an external Docker network named `web`.
 
 This allows Traefik to communicate with Uptime Kuma without exposing Uptime Kuma's internal port to the host.
+
+Before deploying the services, ensure to create the network:
+
+```bash
+sudo docker network create web
+```
 
 **Let's Encrypt**
 
@@ -595,9 +601,9 @@ You can read more on deployment [here](https://massivegrid.com/blog/uptime-kuma-
 
 ### Important version note
 
-The example uses the Uptime Kuma `2` image tag and Traefik `v3.7` image tag.
+This deployment uses the official Uptime Kuma `2` image tag, which follows the latest release in the v2 major-version series. This is intentional and follows the project's recommended image-tagging [approach](https://hub.docker.com/r/louislam/uptime-kuma#tags). Administrators should nevertheless review release notes and perform backups before updating production deployments.
 
-These are major-version tags, not immutable image versions. For a production deployment, consider pinning Traefik image to a specific tested release or digest, or keeping the pre-provided tag. This gives you more predictable upgrades and reduces the risk of an unexpected image update changing the deployment. With regards to Uptime Kuma, following the maintainer's [suggestion](https://hub.docker.com/r/louislam/uptime-kuma#tags), keep the tag as is.
+As for Traefik, `v3.7` image tag is used. For a production deployment, this tag can be retained or be adjusted to a specific tested release or digest. This gives you more predictable upgrades and reduces the risk of an unexpected image update changing the deployment.
 
 Check the official project release information before choosing the exact versions:
 
@@ -849,41 +855,331 @@ Do not rely exclusively on backups stored on the same VPS / server.
 
 ### 15.2 Recovery procedure
 
+The recovery process restores the deployment configuration, Uptime Kuma application data, and Traefik certificate information from a previously created backup.
+
+There are two supported recovery methods:
+
+1. Restoring a local .tar.gz backup.
+2. Restoring an encrypted Restic snapshot from off-site storage.
+
+Both methods ultimately produce the same application archive, which must be extracted into the actual deployment directory.
+
+> **Important**: The backup archive contains `compose.yaml`, `.env`, `uptime-kuma-data/`, and `letsencrypt/`. It does not contain the Git repository, maintenance scripts, systemd units, or Restic configuration file. Obtain the deployment files separately from the Git repository or another trusted copy.
+
+#### 15.2.1 Prepare the replacement server
+
 To restore:
 
-1. Provision a replacement server.
-2. Install Docker Engine and Docker Compose.
-3. Restore the deployment directory and its contents:
+1. Provision a replacement Ubuntu server.
+2. Install Docker Engine and the Docker Compose plugin using the installation procedure described earlier in this guide.
+3. Obtain the deployment repository and place its contents in `/opt/uptime-kuma`.
+
+For example:
 
 ```bash
-sudo mkdir -p /tmp/uptime-kuma-restore-test
-sudo tar -xzf /var/backups/uptime-kuma/REPLACE_WITH_ARCHIVE.tar.gz \
-  -C /tmp/uptime-kuma-restore-test
+sudo mkdir -p /opt/uptime-kuma
+sudo chown "$USER":"$USER" /opt/uptime-kuma
+
+git clone YOUR_REPOSITORY_URL /opt/uptime-kuma
 ```
 
-For a Restic snapshot, load the same environment securely and inspect snapshots:
+Replace `YOUR_REPOSITORY_URL` with the actual repository URL.
+
+If the original Git repository is unavailable, obtain a trusted copy of the deployment files from another source.
+
+Create the external Docker network required by the Compose configuration:
 
 ```bash
-sudo bash -c 'set -a; . /etc/uptime-kuma-restic.env; set +a; restic snapshots'
+sudo docker network create web
 ```
 
-Then restore a selected snapshot to a separate directory:
+If the network already exists, Docker will report that it exists; there is no need to recreate it.
+
+#### 15.2.2 Method A: Restore a local backup archive
+
+If you have a local or separately downloaded backup archive, identify its full path.
+
+For example:
+
+```dotenv
+ARCHIVE="/path/to/uptime-kuma-20261108T033000Z.tar.gz"
+```
+
+First, verify that the archive can be read:
 
 ```bash
-sudo bash -c 'set -a; . /etc/uptime-kuma-restic.env; set +a; restic restore latest --target /tmp/uptime-kuma-restic-restore-test'
+sudo tar -tzf "$ARCHIVE" >/dev/null
 ```
 
-4. Confirm that `.env` has the correct hostname and email address.
-5. Ensure `letsencrypt/acme.json` remains private (normally mode `600`).
-6. Start the deployment:
+Extract it into a temporary directory first:
 
 ```bash
-docker compose up -d
+sudo mkdir -p /tmp/uptime-kuma-restore
+
+sudo tar -xzf "$ARCHIVE" \
+ -C /tmp/uptime-kuma-restore
 ```
 
-7. Verify that Uptime Kuma loads and the application, monitors, and HTTPS certificate work.
+Inspect the extracted contents:
 
-For important deployments, periodically test restoration on a separate environment.
+```bash
+sudo ls -la /tmp/uptime-kuma-restore
+```
+
+You should find:
+
+```text
+compose.yaml
+.env
+uptime-kuma-data/
+letsencrypt/
+```
+
+If these files and directories are present, proceed with the restoration.
+
+For a fresh deployment directory, extract the archive into the actual deployment directory:
+
+```bash
+sudo tar -xzf "$ARCHIVE" \
+ -C /opt/uptime-kuma
+```
+
+This restores the Compose configuration, environment file, application data, and certificate information.
+
+If restoring over an existing deployment, stop the existing services first and preserve the old application data directories separately. Do not merge old application data with restored data.
+
+#### 15.2.3 Method B: Restore an encrypted Restic snapshot
+
+If your backup exists in the configured Restic repository, first ensure Restic is installed.
+
+Install or recreate the Restic environment configuration file using the instructions in Section 16. Do not assume that this file is included in the application backup.
+
+You must have the correct:
+
+- Restic repository URL.
+
+- Restic encryption password.
+
+- S3-compatible storage access key.
+
+- S3-compatible storage secret key.
+
+The Restic password is particularly important: without it, the repository contents cannot be decrypted.
+
+List available snapshots:
+
+```bash
+sudo bash -c \
+ 'set -a; source /etc/uptime-kuma-restic.env; set +a; restic snapshots --tag uptime-kuma'
+```
+
+Identify the snapshot you wish to restore and copy its snapshot ID.
+
+Restore the selected snapshot into a temporary directory:
+
+```bash
+sudo mkdir -p /tmp/uptime-kuma-restic-restore
+
+sudo bash -c \
+ 'set -a; source /etc/uptime-kuma-restic.env; set +a; restic restore REPLACE_WITH_SNAPSHOT_ID --target /tmp/uptime-kuma-restic-restore'
+```
+
+Replace `REPLACE_WITH_SNAPSHOT_ID` with the actual snapshot ID.
+
+Restic reconstructs the original filesystem paths beneath the specified target directory. Consequently, the archive will normally be located somewhere under:
+
+```bash
+/tmp/uptime-kuma-restic-restore/var/backups/uptime-kuma/
+```
+
+Locate the restored archive:
+
+```bash
+sudo find /tmp/uptime-kuma-restic-restore \
+ -type f \
+ -name 'uptime-kuma-\*.tar.gz'
+```
+
+Identify the archive corresponding to the snapshot you selected.
+
+For example:
+
+```dotenv
+ARCHIVE="/tmp/uptime-kuma-restic-restore/var/backups/uptime-kuma/uptime-kuma-20261108T033000Z.tar.gz"
+```
+
+The actual filename and path depend on the snapshot.
+
+Verify the archive:
+
+```bash
+sudo tar -tzf "$ARCHIVE" >/dev/null
+```
+
+Then extract it into the actual deployment directory:
+
+```bash
+sudo tar -xzf "$ARCHIVE" \
+ -C /opt/uptime-kuma
+```
+
+At this point, both recovery methods have produced the same deployment directory structure.
+
+#### 15.2.4 Verify the restored configuration and permissions
+
+Before starting the services, inspect the restored environment file:
+
+```bash
+sudo nano /opt/uptime-kuma/.env
+```
+
+Confirm that:
+
+- `DOMAIN` points to the correct public hostname.
+
+- `ACME_EMAIL` contains the correct email address.
+
+Restrict access to the environment file:
+
+```bash
+sudo chmod 600 /opt/uptime-kuma/.env
+```
+
+Ensure that the Let's Encrypt storage file exists and has restrictive permissions:
+
+```bash
+sudo touch /opt/uptime-kuma/letsencrypt/acme.json
+sudo chmod 600 /opt/uptime-kuma/letsencrypt/acme.json
+```
+
+Do not replace an existing restored `acme.json` with an empty file. The touch command above only creates it if it is missing.
+
+Ensure the persistent application data directory exists:
+
+```bash
+sudo mkdir -p /opt/uptime-kuma/uptime-kuma-data
+```
+
+Check that the external Docker network exists:
+
+```bash
+sudo docker network inspect web
+```
+
+If it does not exist, create it:
+
+```bash
+sudo docker network create web
+```
+
+Validate the Compose configuration:
+
+```bash
+cd /opt/uptime-kuma
+
+sudo docker compose config --quiet
+```
+
+#### 15.2.5 Start and verify the restored deployment
+
+Pull the required container images:
+
+```bash
+cd /opt/uptime-kuma
+
+sudo docker compose pull
+```
+
+Start the services:
+
+```bash
+sudo docker compose up -d
+```
+
+Check their status:
+
+```bash
+sudo docker compose ps
+```
+
+Inspect the logs if necessary:
+
+```bash
+sudo docker compose logs --tail=100
+```
+
+Verify that:
+
+1. The Docker socket proxy is running.
+
+2. Traefik is running and healthy.
+
+3. Uptime Kuma is running and healthy.
+
+4. Uptime Kuma's previous monitors and application settings are present.
+
+5. The public hostname resolves to the replacement server.
+
+6. HTTPS works and the certificate is valid.
+
+7. Monitoring checks are executing successfully.
+
+If Traefik cannot obtain or renew a certificate, inspect its logs and verify DNS and firewall configuration.
+
+#### 15.2.6 Restore the maintenance automation
+
+The application backup does not contain the maintenance script or systemd units.
+
+Obtain these files from the deployment repository and ensure that they are installed in the correct locations.
+
+For example:
+
+```bash
+sudo install -D -m 0750 \
+ /opt/uptime-kuma/scripts/weekly-maintenance.sh \
+ /opt/uptime-kuma/scripts/weekly-maintenance.sh
+```
+
+If the repository files are already in the correct deployment directory, ensure the script is executable:
+
+```bash
+sudo chmod 0750 \
+ /opt/uptime-kuma/scripts/weekly-maintenance.sh
+```
+
+Recreate the Restic environment configuration file separately, using the correct repository credentials and encryption password.
+
+Then install and enable the systemd service and timer using the instructions in Section 16.
+
+Finally, verify that the timer is active:
+
+```bash
+sudo systemctl enable --now uptime-kuma-maintenance.timer
+
+sudo systemctl status uptime-kuma-maintenance.timer
+
+sudo systemctl list-timers --all | grep uptime-kuma
+```
+
+#### 15.2.7 Recovery testing
+
+For important deployments, periodically test recovery on a separate VPS or isolated environment.
+
+A successful restoration should demonstrate that:
+
+- The archive can be retrieved.
+
+- The archive can be extracted.
+
+- Docker Compose can reconstruct the services.
+
+- Uptime Kuma retains its monitors, settings and historical data.
+
+- Traefik can serve the application over HTTPS.
+
+- The maintenance automation can be restored and executed.
+
+Do not consider a backup verified simply because Restic reports that it uploaded successfully.
 
 > A backup that has never been restored is not a verified recovery plan.
 
@@ -1301,7 +1597,6 @@ uptime-kuma-traefik/
 └── uptime-kuma-data/
     └── .gitkeep
 ```
-
 
 The `letsencrypt` and `uptime-kuma-data` data directories are created on the server and hold persistent application data outside the containers. Their contents are intentionally excluded from Git.
 
