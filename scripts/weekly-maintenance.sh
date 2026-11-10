@@ -12,6 +12,7 @@ LOCK_FILE="/run/lock/uptime-kuma-maintenance.lock"
 RESTIC_ENV_FILE="${RESTIC_ENV_FILE:-/etc/uptime-kuma-restic.env}"
 RESTIC_ENABLED=true
 AUTO_INSTALL_RESTIC=false
+AUTO_INIT_RESTIC=false
 
 usage() {
     cat <<USAGE
@@ -154,7 +155,8 @@ if [[ "$RESTIC_ENABLED" == true ]]; then
         log "ERROR: $RESTIC_ENV_FILE must be owned by root."
         exit 1
     fi
-    if (( ( $(stat -c '%a' "$RESTIC_ENV_FILE") & 077 ) != 0 )); then
+    mode="$(stat -c '%a' "$RESTIC_ENV_FILE")"
+    if (( ( 8#$mode & 077 ) != 0 )); then
         log "ERROR: $RESTIC_ENV_FILE permissions are too broad; use chmod 600."
         exit 1
     fi
