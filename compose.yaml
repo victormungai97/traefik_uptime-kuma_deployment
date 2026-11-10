@@ -129,8 +129,5 @@ networks:
   # Strictly internal network so the proxy API is hidden from the web
   traefik-socket-security:
     internal: true
-  # Network used to connect Traefik to your application containers
+  # Network used to connect Traefik to application container(s)
   web:
-    external: true
-    name: web
-    driver: bridge
