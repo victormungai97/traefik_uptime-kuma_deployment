@@ -14,6 +14,8 @@ RESTIC_ENV_FILE="${RESTIC_ENV_FILE:-/etc/uptime-kuma-restic.env}"
 RESTIC_ENABLED=true
 AUTO_INSTALL_RESTIC=false
 AUTO_INIT_RESTIC=false
+RESTIC_DRY_RUN=false
+RESTIC_DRY_RUN_FLAG=""
 
 usage() {
     cat <<USAGE
@@ -27,6 +29,8 @@ Options:
   --install-restic    Install Restic automatically through APT if it is missing.
   --init-restic       Attempt to initialize the configured repository, then
                       verify it. Existing accessible repositories are reused.
+  --dry-run           Preview backups that will be deleted when running `restic forget`.
+                      No files will be modified.
   -h, --help          Show this help.
 
 Default behaviour (no options): local backup + Restic upload.
@@ -37,6 +41,7 @@ Examples:
   sudo ${SCRIPT_NAME} --install-restic
   sudo ${SCRIPT_NAME} --init-restic
   sudo ${SCRIPT_NAME} --install-restic --init-restic
+  sudo ${SCRIPT_NAME} --dry-run
 
 Environment overrides:
   DEPLOY_DIR, BACKUP_DIR, LOG_FILE, RESTIC_ENV_FILE
@@ -53,6 +58,10 @@ while (($#)); do
             ;;
         --init-restic)
             AUTO_INIT_RESTIC=true
+            ;;
+        --dry-run)
+            RESTIC_DRY_RUN=true
+            RESTIC_DRY_RUN_FLAG="--dry-run"
             ;;
         -h|--help)
             usage
@@ -274,11 +283,13 @@ log "All Compose services are running after backup."
 # Upload only after the services are back online, so a slow internet connection
 # does not extend the monitoring outage.
 if [[ "$RESTIC_ENABLED" == true ]]; then
-    log "Uploading encrypted backup to S3 compatible storage service using Restic..."
-    restic backup "$backup_file" --tag uptime-kuma --host "$(hostname -f 2>/dev/null || hostname)"
+    if [[ "$RESTIC_DRY_RUN" == false ]]; then
+        log "Uploading encrypted backup to S3 compatible storage service using Restic..."
+        restic backup "$backup_file" --tag uptime-kuma --host "$(hostname -f 2>/dev/null || hostname)"
+    fi
 
     log "Applying ${RETENTION_DAYS}-day retention to off-site Restic snapshots..."
-    restic forget --tag uptime-kuma --group-by host,tags --keep-within "${RETENTION_DAYS}d" --prune
+    restic forget --tag uptime-kuma --group-by host,tags --keep-within "${RETENTION_DAYS}d" $RESTIC_DRY_RUN_FLAG --prune
     log "Off-site backup upload and retention completed."
 else
     log "Restic operations skipped. Local backup is available at: $backup_file"
