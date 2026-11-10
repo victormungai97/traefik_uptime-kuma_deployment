@@ -278,7 +278,7 @@ if [[ "$RESTIC_ENABLED" == true ]]; then
     restic backup "$backup_file" --tag uptime-kuma --host "$(hostname -f 2>/dev/null || hostname)"
 
     log "Applying ${RETENTION_DAYS}-day retention to off-site Restic snapshots..."
-    restic forget --tag uptime-kuma --keep-within "${RETENTION_DAYS}d" --prune
+    restic forget --tag uptime-kuma --group-by host,tags --keep-within "${RETENTION_DAYS}d" --prune
     log "Off-site backup upload and retention completed."
 else
     log "Restic operations skipped. Local backup is available at: $backup_file"
