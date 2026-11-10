@@ -407,10 +407,8 @@ Log out and reconnect for the group membership to take effect.
 Alternatively, to apply the new group membership immediately, type the following:
 
 ```bash
-su${USER}
+newgrp docker
 ```
-
-You will be prompted to enter your user’s password to continue.
 
 Confirm that your user is now added to the docker group by typing:
 
@@ -950,7 +948,7 @@ sudo nano /etc/uptime-kuma-restic.env
 Example contents:
 
 ```bash
-RESTIC_REPOSITORY="b2:your-private-bucket:uptime-kuma"
+RESTIC_REPOSITORY="s3:http(s)://s3-storage-service-domain[:s3-storage-service-port]/your-private-bucket:uptime-kuma"
 AWS_ACCESS_KEY_ID="your_s3_access_key_id"
 AWS_SECRET_ACCESS_KEY="your_s3_secret_access_key"
 RESTIC_PASSWORD="replace-with-a-long-unique-random-password"
